@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Comparador de Facturas</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --blue:    #1a56db;
+    --blue-dk: #1142aa;
+    --blue-lt: #e8f0fd;
+    --gray:    #f3f4f6;
+    --gray-dk: #6b7280;
+    --red:     #dc2626;
+    --green:   #16a34a;
+    --yellow:  #d97706;
+    --radius:  12px;
+    --shadow:  0 2px 16px rgba(0,0,0,.10);
+  }
+
+  body {
+    font-family: Inter, system-ui, sans-serif;
+    background: #f0f4ff;
+    color: #111827;
+    min-height: 100vh;
+    padding: 24px 16px 48px;
+  }
+
+  header {
+    text-align: center;
+    margin-bottom: 32px;
+  }
+  header h1 { font-size: 1.75rem; color: var(--blue); font-weight: 700; }
+  header p  { color: var(--gray-dk); margin-top: 6px; }
+
+  .card {
+    background: #fff;
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 28px;
+    max-width: 780px;
+    margin: 0 auto 24px;
+  }
+  .card h2 {
+    font-size: 1.05rem;
+    font-weight: 600;
+    margin-bottom: 18px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #1e293b;
+  }
+
+  /* ── Drop zones ── */
+  .drop-zone {
+    border: 2px dashed #cbd5e1;
+    border-radius: 10px;
+    padding: 32px 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: background .18s, border-color .18s;
+    position: relative;
+  }
+  .drop-zone:hover, .drop-zone.drag-over {
+    background: var(--blue-lt);
+    border-color: var(--blue);
+  }
+  .drop-zone input[type=file] {
+    position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
+  }
+  .drop-zone .icon { font-size: 2.2rem; margin-bottom: 8px; }
+  .drop-zone p     { color: var(--gray-dk); font-size: .92rem; }
+  .drop-zone span  { color: var(--blue); font-weight: 600; }
+
+  .zone-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 580px) { .zone-grid { grid-template-columns: 1fr; } }
+
+  /* ── File list ── */
+  .file-list { margin-top: 14px; display: flex; flex-direction: column; gap: 8px; }
+  .file-item {
+    display: flex; align-items: center; justify-content: space-between;
+    background: var(--gray); border-radius: 8px; padding: 8px 12px;
+    font-size: .88rem;
+  }
+  .file-item .fname { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; }
+  .file-item .fname span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .file-item button {
+    background: none; border: none; cursor: pointer; color: var(--red);
+    font-size: 1.1rem; padding: 0 4px; flex-shrink: 0;
+  }
+  .badge-pdf  { background: #fee2e2; color: #b91c1c; }
+  .badge-xls  { background: #dcfce7; color: #166534; }
+  .badge {
+    font-size: .72rem; font-weight: 600; padding: 2px 7px;
+    border-radius: 20px; flex-shrink: 0;
+  }
+
+  /* ── Buttons ── */
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 11px 24px; border-radius: 8px; font-size: .95rem;
+    font-weight: 600; cursor: pointer; border: none; transition: .18s;
+  }
+  .btn-primary { background: var(--blue); color: #fff; }
+  .btn-primary:hover:not(:disabled) { background: var(--blue-dk); }
+  .btn-primary:disabled { opacity: .45; cursor: not-allowed; }
+  .btn-outline { background: #fff; color: var(--blue); border: 2px solid var(--blue); }
+  .btn-outline:hover { background: var(--blue-lt); }
+  .btn-green  { background: var(--green); color: #fff; font-size: 1.05rem; padding: 13px 28px; }
+  .btn-green:hover { background: #15803d; }
+  .btn-wrap { display: flex; justify-content: flex-end; margin-top: 20px; }
+
+  /* ── Progress ── */
+  #section-progress { display: none; }
+  .progress-bar-wrap {
+    background: #e2e8f0; border-radius: 50px; height: 12px; overflow: hidden; margin-bottom: 12px;
+  }
+  .progress-bar {
+    height: 100%; background: linear-gradient(90deg, var(--blue), #60a5fa);
+    border-radius: 50px; width: 0%;
+    transition: width .4s ease;
+    animation: shimmer 1.5s infinite;
+    background-size: 200% 100%;
+  }
+  @keyframes shimmer {
+    0%   { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+  }
+  .status-msg { color: var(--gray-dk); font-size: .92rem; text-align: center; }
+
+  /* ── Results ── */
+  #section-results { display: none; }
+  .cards-grid {
+    display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; margin-bottom: 24px;
+  }
+  @media (max-width: 500px) { .cards-grid { grid-template-columns: 1fr; } }
+
+  .stat-card {
+    border-radius: 10px; padding: 18px 20px;
+    display: flex; flex-direction: column; gap: 4px;
+  }
+  .stat-card .label { font-size: .82rem; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+  .stat-card .value { font-size: 2rem; font-weight: 700; }
+  .stat-card .sub   { font-size: .82rem; opacity: .8; }
+
+  .sc-green  { background: #f0fdf4; color: #166534; }
+  .sc-yellow { background: #fffbeb; color: #92400e; }
+  .sc-blue   { background: #eff6ff; color: #1e40af; }
+  .sc-purple { background: #faf5ff; color: #6b21a8; }
+
+  .result-actions { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+
+  /* ── Alert ── */
+  .alert {
+    background: #fef2f2; border: 1px solid #fca5a5; color: #991b1b;
+    border-radius: 8px; padding: 12px 16px; margin-top: 14px; font-size: .9rem;
+    display: none;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>📊 Comparador de Facturas</h1>
+  <p>Sube tus facturas PDF y la tabla Excel para generar el reporte de comparación</p>
+</header>
+
+<!-- ── Sección 1: Subida ── -->
+<section class="card" id="section-upload">
+  <h2>📁 1. Selecciona los archivos</h2>
+  <div class="zone-grid">
+    <!-- PDFs -->
+    <div>
+      <p style="font-size:.85rem;font-weight:600;margin-bottom:8px;color:#374151;">
+        Facturas PDF <span style="color:var(--gray-dk);font-weight:400;">(uno o varios)</span>
+      </p>
+      <div class="drop-zone" id="zone-pdf">
+        <input type="file" id="input-pdf" accept=".pdf" multiple/>
+        <div class="icon">📄</div>
+        <p><span>Selecciona PDFs</span> o arrastra aquí</p>
+        <p style="font-size:.78rem;margin-top:4px;">Acepta múltiples archivos .pdf</p>
+      </div>
+      <div class="file-list" id="list-pdf"></div>
+    </div>
+    <!-- Excel -->
+    <div>
+      <p style="font-size:.85rem;font-weight:600;margin-bottom:8px;color:#374151;">
+        Tabla de guías Excel
+      </p>
+      <div class="drop-zone" id="zone-xls">
+        <input type="file" id="input-xls" accept=".xlsx,.xls"/>
+        <div class="icon">📊</div>
+        <p><span>Selecciona Excel</span> o arrastra aquí</p>
+        <p style="font-size:.78rem;margin-top:4px;">Un solo archivo .xlsx</p>
+      </div>
+      <div class="file-list" id="list-xls"></div>
+    </div>
+  </div>
+
+  <div id="alert-upload" class="alert"></div>
+
+  <div class="btn-wrap">
+    <button class="btn btn-primary" id="btn-procesar" disabled onclick="procesar()">
+      ⚙️ Procesar Comparación
+    </button>
+  </div>
+</section>
+
+<!-- ── Sección 2: Progreso ── -->
+<section class="card" id="section-progress">
+  <h2>⏳ 2. Procesando...</h2>
+  <div class="progress-bar-wrap">
+    <div class="progress-bar" id="progress-bar"></div>
+  </div>
+  <p class="status-msg" id="status-msg">Subiendo archivos...</p>
+</section>
+
+<!-- ── Sección 3: Resultados ── -->
+<section class="card" id="section-results">
+  <h2>✅ 3. Resultados</h2>
+  <div class="cards-grid">
+    <div class="stat-card sc-green">
+      <span class="label">✅ Entregadas</span>
+      <span class="value" id="res-ent">—</span>
+      <span class="sub">guías en ambos documentos</span>
+    </div>
+    <div class="stat-card sc-yellow">
+      <span class="label">⚠️ Estado diferente</span>
+      <span class="value" id="res-dif">—</span>
+      <span class="sub">guías con discrepancias</span>
+    </div>
+    <div class="stat-card sc-blue">
+      <span class="label">📄 Solo en Excel</span>
+      <span class="value" id="res-xls">—</span>
+      <span class="sub">no aparecen en PDF</span>
+    </div>
+    <div class="stat-card sc-purple">
+      <span class="label">📋 Solo en PDF</span>
+      <span class="value" id="res-pdf">—</span>
+      <span class="sub">no aparecen en Excel</span>
+    </div>
+  </div>
+
+  <div class="result-actions">
+    <button class="btn btn-green" id="btn-descargar" onclick="descargar()">
+      ⬇ Descargar Excel de Resultados
+    </button>
+    <button class="btn btn-outline" onclick="nuevaComparacion()">
+      🔄 Nueva Comparación
+    </button>
+  </div>
+</section>
+
+<script>
+// ── Estado ────────────────────────────────────────────────────────────────────
+let pdfFiles = [];
+let xlsFile  = null;
+let sessionId = null;
+let resultFile = null;
+
+// ── Drag & drop helpers ───────────────────────────────────────────────────────
+function setupZone(zoneId, inputId, multi) {
+  const zone  = document.getElementById(zoneId);
+  const input = document.getElementById(inputId);
+
+  zone.addEventListener("dragover",  e => { e.preventDefault(); zone.classList.add("drag-over"); });
+  zone.addEventListener("dragleave", () => zone.classList.remove("drag-over"));
+  zone.addEventListener("drop", e => {
+    e.preventDefault();
+    zone.classList.remove("drag-over");
+    const files = [...e.dataTransfer.files];
+    if (multi) addPdfs(files); else setXls(files[0]);
+  });
+  input.addEventListener("change", () => {
+    const files = [...input.files];
+    if (multi) addPdfs(files); else setXls(files[0]);
+    input.value = "";
+  });
+}
+
+setupZone("zone-pdf", "input-pdf", true);
+setupZone("zone-xls", "input-xls", false);
+
+function addPdfs(files) {
+  files.forEach(f => {
+    if (!f.name.toLowerCase().endsWith(".pdf")) return;
+    if (!pdfFiles.find(x => x.name === f.name)) pdfFiles.push(f);
+  });
+  renderPdfList();
+  checkReady();
+}
+
+function setXls(file) {
+  if (!file) return;
+  if (!file.name.match(/\.xlsx?$/i)) { showAlert("El archivo Excel debe ser .xlsx"); return; }
+  xlsFile = file;
+  renderXlsList();
+  checkReady();
+}
+
+function renderPdfList() {
+  const el = document.getElementById("list-pdf");
+  el.innerHTML = pdfFiles.map((f, i) => `
+    <div class="file-item">
+      <div class="fname">
+        <span class="badge badge-pdf">PDF</span>
+        <span title="${f.name}">${f.name}</span>
+      </div>
+      <button onclick="removePdf(${i})" title="Eliminar">✕</button>
+    </div>`).join("");
+}
+
+function renderXlsList() {
+  const el = document.getElementById("list-xls");
+  el.innerHTML = xlsFile ? `
+    <div class="file-item">
+      <div class="fname">
+        <span class="badge badge-xls">XLS</span>
+        <span title="${xlsFile.name}">${xlsFile.name}</span>
+      </div>
+      <button onclick="removeXls()" title="Eliminar">✕</button>
+    </div>` : "";
+}
+
+function removePdf(i) { pdfFiles.splice(i, 1); renderPdfList(); checkReady(); }
+function removeXls()  { xlsFile = null; renderXlsList(); checkReady(); }
+
+function checkReady() {
+  document.getElementById("btn-procesar").disabled = !(pdfFiles.length > 0 && xlsFile);
+}
+
+// ── Progreso ──────────────────────────────────────────────────────────────────
+function setProgress(pct, msg) {
+  document.getElementById("progress-bar").style.width = pct + "%";
+  document.getElementById("status-msg").textContent = msg;
+}
+
+function show(id)  { document.getElementById(id).style.display = "block"; }
+function hide(id)  { document.getElementById(id).style.display = "none"; }
+
+function showAlert(msg) {
+  const el = document.getElementById("alert-upload");
+  el.textContent = "⚠️ " + msg;
+  el.style.display = "block";
+}
+function hideAlert() { document.getElementById("alert-upload").style.display = "none"; }
+
+// ── Procesar ──────────────────────────────────────────────────────────────────
+async function procesar() {
+  hideAlert();
+  hide("section-upload");
+  show("section-progress");
+  setProgress(10, "Subiendo archivos...");
+
+  try {
+    // 1. Upload
+    const form = new FormData();
+    pdfFiles.forEach(f => form.append("pdfs", f));
+    form.append("excel", xlsFile);
+
+    const upRes = await fetch("/upload", { method: "POST", body: form });
+    if (!upRes.ok) {
+      const err = await upRes.json().catch(() => ({ detail: upRes.statusText }));
+      throw new Error(err.detail || "Error al subir archivos");
+    }
+    const upData = await upRes.json();
+    sessionId = upData.session_id;
+
+    // Simular progreso mientras procesamos
+    setProgress(30, `Archivos subidos. Extrayendo ${pdfFiles.length} PDF(s)...`);
+    await tick(400);
+
+    // Animar progreso por PDF
+    const step = 50 / pdfFiles.length;
+    for (let i = 0; i < pdfFiles.length; i++) {
+      setProgress(30 + step * i, `Extrayendo PDF ${i+1} de ${pdfFiles.length}: ${pdfFiles[i].name}`);
+      await tick(300);
+    }
+
+    setProgress(82, "Comparando y generando reporte...");
+    await tick(200);
+
+    // 2. Procesar
+    const procRes = await fetch(`/procesar/${sessionId}`, { method: "POST" });
+    if (!procRes.ok) {
+      const err = await procRes.json().catch(() => ({ detail: procRes.statusText }));
+      throw new Error(err.detail || "Error al procesar");
+    }
+    const procData = await procRes.json();
+    resultFile = procData.archivo;
+
+    setProgress(100, "¡Listo!");
+    await tick(600);
+
+    mostrarResultados(procData.resumen);
+
+  } catch (err) {
+    hide("section-progress");
+    show("section-upload");
+    showAlert(err.message);
+  }
+}
+
+function tick(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+function mostrarResultados(resumen) {
+  hide("section-progress");
+  show("section-results");
+  document.getElementById("res-ent").textContent = resumen.entregadas;
+  document.getElementById("res-dif").textContent = resumen.estado_diferente;
+  document.getElementById("res-xls").textContent = resumen.solo_excel;
+  document.getElementById("res-pdf").textContent = resumen.solo_pdf;
+}
+
+// ── Descargar ─────────────────────────────────────────────────────────────────
+async function descargar() {
+  if (!resultFile) return;
+  const a = document.createElement("a");
+  a.href = `/descargar/${resultFile}`;
+  a.download = resultFile;
+  a.click();
+
+  // Limpiar sesión tras descarga
+  if (sessionId) {
+    fetch(`/limpiar/${sessionId}`, { method: "DELETE" }).catch(() => {});
+    sessionId = null;
+  }
+}
+
+// ── Nueva comparación ─────────────────────────────────────────────────────────
+function nuevaComparacion() {
+  if (sessionId) {
+    fetch(`/limpiar/${sessionId}`, { method: "DELETE" }).catch(() => {});
+    sessionId = null;
+  }
+  pdfFiles = []; xlsFile = null; resultFile = null;
+  renderPdfList(); renderXlsList();
+  checkReady(); hideAlert();
+  hide("section-results");
+  hide("section-progress");
+  show("section-upload");
+  setProgress(0, "");
+}
+</script>
+</body>
+</html>

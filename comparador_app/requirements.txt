@@ -1,0 +1,8 @@
+fastapi
+uvicorn[standard]
+pymupdf
+pandas
+openpyxl
+rapidfuzz
+python-multipart
+aiofiles
