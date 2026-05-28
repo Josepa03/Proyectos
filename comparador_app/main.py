@@ -1,7 +1,9 @@
 """
 main.py — Servidor FastAPI para comparación PDF vs Excel
+Compatible con Replit: usa /tmp/ para escritura y puerto 8080.
 """
 import logging
+import os
 import shutil
 import uuid
 from pathlib import Path
@@ -20,13 +22,18 @@ logging.basicConfig(
 )
 log = logging.getLogger("main")
 
-UPLOADS_DIR = Path("uploads")
-OUTPUTS_DIR = Path("outputs")
-UPLOADS_DIR.mkdir(exist_ok=True)
-OUTPUTS_DIR.mkdir(exist_ok=True)
+# /tmp/ es el único directorio de escritura garantizado en Replit
+UPLOADS_DIR = Path("/tmp/uploads")
+OUTPUTS_DIR = Path("/tmp/outputs")
+UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+OUTPUTS_DIR.mkdir(parents=True, exist_ok=True)
+
+# Detectar dónde está static/ (relativo al archivo main.py)
+BASE_DIR = Path(__file__).parent
+STATIC_DIR = BASE_DIR / "static"
 
 app = FastAPI(title="Comparador de Facturas")
-app.mount("/static", StaticFiles(directory="static"), name="static")
+app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 # ── Sesiones en memoria ───────────────────────────────────────────────────────
 sessions: dict[str, dict] = {}
@@ -34,7 +41,7 @@ sessions: dict[str, dict] = {}
 # ── Endpoints ─────────────────────────────────────────────────────────────────
 @app.get("/", response_class=HTMLResponse)
 async def root():
-    html = Path("static/index.html").read_text(encoding="utf-8")
+    html = (STATIC_DIR / "index.html").read_text(encoding="utf-8")
     return HTMLResponse(content=html)
 
 
@@ -43,7 +50,6 @@ async def upload_files(
     pdfs: list[UploadFile] = File(...),
     excel: UploadFile = File(...),
 ):
-    # Validaciones
     if not pdfs or all(f.filename == "" for f in pdfs):
         raise HTTPException(400, "Se requiere al menos un archivo PDF.")
     if not excel.filename:
@@ -57,9 +63,8 @@ async def upload_files(
     session_id = str(uuid.uuid4())
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     session_dir = UPLOADS_DIR / session_id
-    session_dir.mkdir()
+    session_dir.mkdir(parents=True)
 
-    # Guardar PDFs
     pdf_paths = []
     for pdf_file in pdfs:
         dest = session_dir / f"{ts}_{pdf_file.filename}"
@@ -68,7 +73,6 @@ async def upload_files(
         pdf_paths.append(str(dest))
         log.info("PDF guardado: %s", dest)
 
-    # Guardar Excel
     excel_dest = session_dir / f"{ts}_{excel.filename}"
     with excel_dest.open("wb") as f:
         shutil.copyfileobj(excel.file, f)
@@ -117,13 +121,24 @@ async def procesar(session_id: str):
 
 @app.get("/descargar/{archivo}")
 async def descargar(archivo: str):
+    # Sanitizar nombre para evitar path traversal
+    archivo = Path(archivo).name
     path = OUTPUTS_DIR / archivo
     if not path.exists():
         raise HTTPException(404, "Archivo no encontrado.")
+
+    # Limpiar la sesión asociada a este archivo tras la descarga
+    session_id_prefix = archivo.replace("resultado_", "").replace(".xlsx", "")
+    for sid, sess in list(sessions.items()):
+        if sid.startswith(session_id_prefix):
+            _limpiar_sesion(sid, sess)
+            break
+
     return FileResponse(
         path=str(path),
         filename=archivo,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        background=None,
     )
 
 
@@ -132,23 +147,29 @@ async def limpiar(session_id: str):
     if session_id not in sessions:
         raise HTTPException(404, "Sesión no encontrada.")
     sess = sessions.pop(session_id)
+    _limpiar_sesion(session_id, sess)
+    return {"status": "limpiado", "session_id": session_id}
 
-    # Borrar uploads de la sesión
+
+def _limpiar_sesion(session_id: str, sess: dict):
+    sessions.pop(session_id, None)
     session_dir = UPLOADS_DIR / session_id
     if session_dir.exists():
-        shutil.rmtree(session_dir)
-
-    # Borrar output
+        shutil.rmtree(session_dir, ignore_errors=True)
     if sess.get("output_file"):
         out = OUTPUTS_DIR / sess["output_file"]
         if out.exists():
-            out.unlink()
-
-    return {"status": "limpiado", "session_id": session_id}
+            try:
+                out.unlink()
+            except OSError:
+                pass
+    log.info("Sesión %s limpiada", session_id)
 
 
 # ── Inicio ────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     import uvicorn
-    print("\n✅ App corriendo en http://localhost:8000 — Abre tu navegador\n")
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    port = int(os.environ.get("PORT", 8080))
+    print(f"\n✅ App corriendo en http://0.0.0.0:{port} — Abre tu navegador\n")
+    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=False)
+

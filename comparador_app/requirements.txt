@@ -6,3 +6,4 @@ openpyxl
 rapidfuzz
 python-multipart
 aiofiles
+pillow
