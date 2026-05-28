@@ -1,0 +1,20 @@
+2026-05-28 17:06:25,883 [INFO] ============================================================
+2026-05-28 17:06:25,883 [INFO] INICIO DE COMPARACIÓN
+2026-05-28 17:06:25,883 [INFO] PDF: factura.pdf
+2026-05-28 17:06:25,883 [INFO] Excel: guias.xlsx
+2026-05-28 17:06:25,883 [INFO] ============================================================
+2026-05-28 17:06:25,883 [INFO] Extrayendo datos del PDF: factura.pdf
+2026-05-28 17:06:25,883 [WARNING] pdfplumber falló (pdfplumber no disponible), usando pymupdf como fallback
+2026-05-28 17:06:25,893 [INFO] PDF: 8 registros extraídos
+2026-05-28 17:06:25,893 [INFO] Leyendo Excel: guias.xlsx
+2026-05-28 17:06:25,898 [INFO] Hoja activa: Sheet1
+2026-05-28 17:06:25,907 [INFO] Columnas Excel: ['N° GUÍA', 'ESTADO', 'COSTO']
+2026-05-28 17:06:25,907 [INFO] Columna guía: N° GUÍA | estado: ESTADO | costo: COSTO
+2026-05-28 17:06:25,909 [INFO] Excel: 7 registros leídos
+2026-05-28 17:06:25,910 [INFO] Moneda detectada: Q
+2026-05-28 17:06:25,918 [INFO] Hoja 'Entregadas': 3 registros
+2026-05-28 17:06:25,921 [INFO] Hoja 'Estado Diferente': 3 registros
+2026-05-28 17:06:25,922 [INFO] Hoja 'Solo en Excel': 1 registros
+2026-05-28 17:06:25,924 [INFO] Hoja 'Solo en PDF': 2 registros
+2026-05-28 17:06:25,934 [INFO] Archivo guardado: resultado_comparacion.xlsx
+2026-05-28 17:06:25,934 [INFO] COMPARACIÓN FINALIZADA
